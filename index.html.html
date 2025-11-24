@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>小红书</title>
+<style>
+  /* ---------- 1. 全局变量与基础设置 (保持不变) ---------- */
+  :root{
+    --bg-white: #ffffff;
+    --text-main: #333333;
+    --text-gray: #999999;     
+    --brand-red: #ff2442;     
+    --nav-active-bg: #f4f4f4; 
+    --search-bg: #f5f5f5;     
+    --modal-radius: 24px; 
+  }
+  
+  html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg-white); color: var(--text-main); -webkit-font-smoothing: antialiased; }
+  a { text-decoration: none; color: inherit; }
+  img { -webkit-user-drag: none; user-select: none; }
+  
+  /* Header */
+  .header { position: fixed; top: 0; left: 0; right: 0; height: 72px; background: #fff; display: flex; align-items: center; padding: 0 24px 0 16px; z-index: 100; }
+  .logo-wrap { width: 240px; display: flex; align-items: center; padding-left: 8px; }
+  .logo-img { height: 32px; width: auto; display: block; cursor: pointer; object-fit: contain; }
+  .search-wrap { flex: 1; display: flex; justify-content: center; }
+  .search-box { width: 100%; max-width: 500px; height: 40px; background: var(--search-bg); border-radius: 999px; display: flex; align-items: center; padding: 0 16px 0 24px; transition: 0.2s; }
+  .search-box:hover { background: #eef0f3; }
+  .search-box input { flex: 1; border: none; outline: none; background: transparent; font-size: 16px; color: #333; height: 100%; }
+  .search-box input::placeholder { color: #999; opacity: 0.8; }
+  .search-icon { width: 20px; height: 20px; color: #666; cursor: pointer; }
+  .header-right { width: 240px; display: flex; justify-content: flex-end; gap: 24px; font-size: 16px; color: #666; font-weight: 400; }
+  .header-right span { cursor: pointer; transition: color 0.2s; }
+  .header-right span:hover { color: #333; }
+
+  /* Sidebar */
+  .sidebar { position: fixed; top: 72px; left: 0; bottom: 0; width: 240px; background: #fff; padding: 20px 16px 20px 16px; display: flex; flex-direction: column; z-index: 90; }
+  .nav-item { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; border-radius: 24px; font-size: 16px; font-weight: 600; color: #333; cursor: pointer; margin-bottom: 8px; transition: background 0.1s; }
+  .nav-item.active { background: var(--nav-active-bg); }
+  .nav-item:hover:not(.active) { background: #fafafa; }
+  .nav-icon { width: 24px; height: 24px; display: block; object-fit: contain; }
+  .avatar-icon { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid #f0f0f0; }
+  .sidebar-bottom { margin-top: auto; }
+
+  /* Main */
+  .main-container { margin-left: 240px; padding: 72px 40px 0 88px; min-height: 100vh; }
+  .tabs-container { width: 100%; padding: 20px 0 16px 0; background: #fff; position: sticky; top: 72px; z-index: 80; display: flex; justify-content: flex-start; gap: 0px; }
+  .tab-item { padding: 8px 14px; border-radius: 999px; font-size: 16px; color: #666; cursor: pointer; user-select: none; transition: all 0.2s; margin-right: 4px; }
+  .tab-item:hover { color: #333; background: #fafafa; }
+  .tab-item.active { background: var(--nav-active-bg); color: #333; font-weight: 600; }
+  
+  /* Grid */
+  .feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; align-items: start; }
+  .card { background: #fff; cursor: pointer; }
+  .card-media { width: 100%; aspect-ratio: 3/4; background: #f8f8f8; border-radius: 12px; position: relative; overflow: hidden; }
+  .card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-info { padding: 12px 4px; }
+  .card-title { font-size: 15px; font-weight: 500; color: #333; line-height: 1.4; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-user { display: flex; align-items: center; justify-content: space-between; color: #999; font-size: 12px; }
+  .user-left { display: flex; align-items: center; gap: 6px; }
+  .user-avatar { width: 20px; height: 20px; border-radius: 50%; background: #eee; object-fit: cover; }
+  .like-right { display: flex; align-items: center; gap: 4px; }
+  
+  /* Buttons */
+  .floating-btns { position: fixed; bottom: 40px; right: 40px; display: flex; flex-direction: column; gap: 16px; z-index: 200; }
+  .float-btn { width: 48px; height: 48px; background: #fff; border-radius: 50%; border: 1px solid #e6e6e6; display: flex; align-items: center; justify-content: center; cursor: default; color: #333; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s; }
+  .float-btn:hover { transform: scale(1.05); }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; }
+  .overlay.open { display: flex; }
+  .modal { width: 950px; max-width: 90vw; height: 85vh; background: #fff; border-radius: var(--modal-radius); display: flex; overflow: hidden; position: relative; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+  
+  /* 关闭按钮 */
+  .close-modal { position: absolute; top: 20px; left: 20px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.9); color: #333; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 20; border: 1px solid rgba(0,0,0,0.05); font-size: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.1s; }
+  .close-modal:hover { transform: scale(1.05); }
+  
+  /* 🔥 修改：左侧媒体区 (改为相对定位，方便放置轮播元素) */
+  .modal-media { 
+    flex: 1.6; background: #f8f8f8; 
+    position: relative; /* 关键 */
+    display: flex; align-items: center; justify-content: center; 
+    overflow: hidden; /* 隐藏溢出 */
+  }
+  /* 图片默认样式：绝对定位居中 */
+  .slider-img { 
+    max-width: 100%; max-height: 100%; object-fit: contain; 
+    display: none; /* 默认隐藏 */
+  }
+  .slider-img.active { display: block; } /* 激活显示 */
+  
+  /* 视频样式 */
+  .modal-media video { width: 100%; height: 100%; object-fit: contain; }
+
+  /* 🔥 新增：轮播图箭头 */
+  .slider-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.8);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 5;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    color: #333;
+    user-select: none;
+  }
+  .slider-btn:hover { background: #fff; }
+  .slider-prev { left: 16px; }
+  .slider-next { right: 16px; }
+  /* 当第一张/最后一张时隐藏箭头 */
+  .slider-btn.hidden { display: none; }
+
+  /* 🔥 新增：底部圆点 */
+  .slider-dots {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 5;
+  }
+  .slider-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(0,0,0,0.2); }
+  .slider-dot.active { background: var(--brand-red); }
+
+  /* 🔥 新增：右上角页码 (如 1/5) */
+  .image-counter {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(0,0,0,0.3); color: #fff;
+    padding: 4px 10px; border-radius: 12px;
+    font-size: 12px; font-weight: 500;
+    z-index: 5;
+  }
+
+  /* 右侧内容区 */
+  .modal-content { flex: 1; display: flex; flex-direction: column; background: #fff; position: relative; min-width: 360px; }
+  .note-header { padding: 24px 24px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid transparent; }
+  .author-big-avatar { width: 40px; height: 40px; border-radius: 50%; background:#eee; object-fit: cover; border:1px solid #f5f5f5;}
+  .author-info { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .author-name { font-weight: 600; font-size: 15px; color: #333; }
+  /* 关注按钮：红底白字 */
+  .follow-btn { border: none; color: #fff; background: var(--brand-red); padding: 8px 24px; border-radius: 20px; font-weight: 600; font-size: 14px; cursor: default; display: flex; align-items: center; justify-content: center; }
+  
+  .note-scroll-area { flex: 1; overflow-y: auto; padding: 0 24px 20px; }
+  .note-scroll-area::-webkit-scrollbar { width: 6px; }
+  .note-scroll-area::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 3px; }
+  .note-title { font-size: 18px; font-weight: 600; margin: 0 0 8px 0; color: #333; line-height: 1.4; }
+  .note-desc { font-size: 15px; line-height: 1.6; color: #333; white-space: pre-wrap; margin-bottom: 12px; }
+  .note-tags { color: #13386c; font-size: 15px; margin-bottom: 12px; font-family: sans-serif; }
+  .note-date { font-size: 12px; color: #999; margin-bottom: 40px; }
+  .comment-empty { border-top: 1px solid #f0f0f0; padding-top: 60px; padding-bottom: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; gap: 10px; }
+  .empty-icon { width: 80px; height: 80px; opacity: 0.2; }
+  
+  /* 底部互动栏 */
+  .note-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; background: #fff; }
+  .footer-left { display: flex; align-items: center; gap: 12px; flex: 1; margin-right: 20px; }
+  .footer-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #eee; flex-shrink: 0; }
+  .footer-input-box { flex: 1; height: 40px; background: #f5f5f5; border-radius: 20px; display: flex; align-items: center; padding-left: 16px; color: #999; font-size: 14px; cursor: text; }
+  .footer-right { display: flex; align-items: center; gap: 20px; color: #333; }
+  .action-icon { width: 24px; height: 24px; cursor: pointer; transition: transform 0.1s; }
+  .action-icon:hover { transform: scale(1.1); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航栏 -->
+<header class="header">
+  <div class="logo-wrap">
+    <!-- 🔴 1. 请修改：这里替换为您的小红书 Logo 图片路径 -->
+    <img src="d:\Users\abbay\Desktop\网页HTML-脚本\logo.png" alt="小红书" class="logo-img">
+  </div>
+  <div class="search-wrap">
+    <div class="search-box">
+      <input type="text" placeholder="搜索小红书" disabled />
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    </div>
+  </div>
+  <div class="header-right">
+    <span>创作中心</span>
+    <span>业务合作</span>
+  </div>
+</header>
+
+<!-- 左侧侧边栏 -->
+<aside class="sidebar">
+  <div class="nav-group">
+    <div class="nav-item active">
+      <!-- 🔴 2. 请修改：这里替换为您的 发现 图标路径 -->
+      <img src="d:\Users\abbay\Desktop\网页HTML-脚本\发现.png" class="nav-icon" alt="发现">
+      <span>发现</span>
+    </div>
+    <div class="nav-item">
+      <!-- 🔴 3. 请修改：这里替换为您的 发布 图标路径 -->
+      <img src="d:\Users\abbay\Desktop\网页HTML-脚本\发布.png" class="nav-icon" alt="发布">
+      <span>发布</span>
+    </div>
+    <div class="nav-item">
+      <!-- 🔴 4. 请修改：这里替换为您的 通知 图标路径 -->
+      <img src="d:\Users\abbay\Desktop\网页HTML-脚本\通知.png" class="nav-icon" alt="通知">
+      <span>通知</span>
+    </div>
+    <div class="nav-item">
+      <!-- 通用风景头像 -->
+      <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23a2d2ff'/><circle cx='80' cy='20' r='10' fill='%23ffea00'/><path d='M0 100 L40 60 L70 90 L100 50 L100 100 Z' fill='%23a8d08d'/></svg>" class="avatar-icon" alt="Me">
+      <span>我</span>
+    </div>
+  </div>
+  <div class="sidebar-bottom">
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+      <span>更多</span>
+    </div>
+  </div>
+</aside>
+
+<!-- 主内容区 -->
+<main class="main-container">
+  <div class="tabs-container">
+    <div class="tab-item active">推荐</div>
+    <div class="tab-item">穿搭</div>
+    <div class="tab-item">美食</div>
+    <div class="tab-item">彩妆</div>
+    <div class="tab-item">影视</div>
+    <div class="tab-item">职场</div>
+    <div class="tab-item">情感</div>
+    <div class="tab-item">家居</div>
+    <div class="tab-item">游戏</div>
+    <div class="tab-item">旅行</div>
+    <div class="tab-item">健身</div>
+  </div>
+  
+  <!-- 内容由 JS 生成 -->
+  <div class="feed-grid" id="feedGrid"></div>
+</main>
+
+<!-- 悬浮按钮 -->
+<div class="floating-btns">
+  <div class="float-btn">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+  </div>
+  <div class="float-btn">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+  </div>
+</div>
+
+<!-- 弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <!-- 左上角关闭按钮 -->
+    <button class="close-modal" onclick="closeModal()">✕</button>
+    
+    <!-- 左侧媒体区 -->
+    <div class="modal-media" id="modalMedia">
+      <!-- JS 动态插入内容 -->
+    </div>
+    
+    <!-- 右侧内容区 -->
+    <div class="modal-content">
+      <div class="note-header">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23a2d2ff'/><circle cx='80' cy='20' r='10' fill='%23ffea00'/><path d='M0 100 L40 60 L70 90 L100 50 L100 100 Z' fill='%23a8d08d'/></svg>" class="author-big-avatar" alt="">
+        <div class="author-info">
+          <div class="author-name">匿名用户</div>
+        </div>
+        <button class="follow-btn">关注</button>
+      </div>
+      
+      <div class="note-scroll-area">
+        <h2 class="note-title" id="modalTitle"></h2>
+        <div class="note-desc" id="modalDesc"></div>
+        <div class="note-tags">#健康养生 #生活记录 #笔记灵感</div>
+        <div class="note-date">01-01 上海</div>
+        
+        <div class="comment-empty">
+          <svg class="empty-icon" viewBox="0 0 1024 1024" fill="currentColor"><path d="M512 64C264.6 64 64 232.3 64 440c0 132.3 81 248.4 203.4 312.3 0 0-27.4 85.4-102.7 139.4 0 0 176.2-10.1 282.4-107.2 20.9 1.9 42.3 3 64.1 3 247.4 0 448-168.3 448-376S759.4 64 512 64zM327.3 485c-32.3 0-58.5-26.2-58.5-58.5s26.2-58.5 58.5-58.5 58.5 26.2 58.5 58.5-26.2 58.5-58.5 58.5z m369.4 0c-32.3 0-58.5-26.2-58.5-58.5s26.2-58.5 58.5-58.5 58.5 26.2 58.5 58.5-26.2 58.5-58.5 58.5z"></path></svg>
+          <div>这里是一片荒地，点击评论</div>
+        </div>
+      </div>
+      
+      <div class="note-footer">
+        <div class="footer-left">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23a2d2ff'/><circle cx='80' cy='20' r='10' fill='%23ffea00'/><path d='M0 100 L40 60 L70 90 L100 50 L100 100 Z' fill='%23a8d08d'/></svg>" class="footer-avatar" alt="">
+          <div class="footer-input-box">说点什么...</div>
+        </div>
+        <div class="footer-right">
+          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.8"><path d="M12 17.75l-6.172 3.245 1.179-6.873-5-4.867 6.9-1 3.086-6.253 3.086 6.253 6.9 1-5 4.867 1.179 6.873z"></path></svg>
+          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.8"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* 
+    ============================================================================
+    🚀 素材修改区 
+    ============================================================================
+  */
+  const notesData = [
+    // 1. 文字版内容 (无轮播，只显示一张封面)
+    {
+      id: 'note_text',
+      type: 'text', 
+      // 🔴 请修改：列表页封面图路径
+      cover: "文字-封面-彩虹.jpg", 
+      // 🔴 请修改：标题
+      title: "彩虹饮食法，让你越吃越健康！",
+      // 🔴 请修改：正文内容 (支持\n换行)
+      desc: `彩虹饮食法\n是美国癌症协会推荐的健康饮食法，核心是食物颜色越丰富，营养越全面。它将食物按天然颜色分为五大类：红、橙黄、绿、紫黑、白，倡导每天摄入多种颜色的天然果蔬，获取多样化营养素。\n为什么呢？因为食物的色彩源于不同的植物化学物（Phytochemicals），如花青素、番茄红素等，每种颜色代表特定的营养素，具有独特功效。\n\n1、红色食物\n富含：番茄红素、花青素、维生素A、铁\n益处： 强大抗氧化剂，可以延缓衰老；促进血液循环，降低心血管疾病；养颜补铁，保持身体年轻态\n食物：草莓、红苹果、樱桃、石榴、红彩椒、番茄、红豆、红米、枸杞、红枣\n\n2、橙黄色食物\n富含：胡萝卜素、维生素C、叶黄素\n益处：保护视力；减少皮肤色斑，维护皮肤健康；调节脾胃；调节内分泌；提高免疫力\n食物：橙子、香蕉、芒果、黄桃、胡萝卜、黄彩椒、韭黄、黄花菜、玉米、小米、南瓜、红薯\n\n3、绿色食物\n富含： 叶绿素、叶酸、膳食纤维\n益处： 促进消化，防止便秘；排毒养颜；维护骨骼健康，提供丰富维生素\n食物：牛油果、猕猴桃、青枣、青豆类、西兰花、青椒、黄瓜、各种绿叶蔬菜\n\n4、紫黑色食物\n富含：花青素、花色苷、多酚类\n益处：理想的抗自由基物质；可以抗氧化和抗炎，抗衰老；改善认知和记忆，保护大脑；预防高血压\n食物：蓝莓、桑葚、葡萄、紫甘蓝、茄子、洋葱、紫薯、黑木耳、黑米、黑豆、黑枸杞、黑芝麻\n\n5、白色食物\n富含：大蒜素、花黄素、硫化物、膳食纤维\n益处：抗菌消炎；降低胆固醇；增强免疫力；稳定血糖，平稳情绪\n食物：梨、香瓜、大蒜、莲藕、白萝卜、口蘑、山药、银耳、白芸豆、白芝麻、冬瓜、大米、燕麦`
+    },
+
+    // 2. 图片版内容 (🔥轮播模式)
+    {
+      id: 'note_image',
+      type: 'image', 
+      // 🔴 请修改：列表页封面图路径
+      cover: "1-彩虹1.png", 
+      // 🔴 请修改：标题
+      title: "跟着彩虹饮食吃，健康气色双在线！",
+      // 🔴 请修改：正文
+      desc: "",
+      // 🔴 请修改：详情页的图片列表 (建议3-6张)
+      images: [
+        "1-彩虹2.png",
+        "1-彩虹3.png",
+        "1-彩虹4.png",
+        "1-彩虹5.png",
+        "1-彩虹6.png",
+      // 如果有更多图片，继续加逗号和路径: "detail_img_4.jpg"
+      ]
+    },
+
+    // 3. 视频版内容
+    {
+      id: 'note_video',
+      type: 'video', 
+      // 🔴 请修改：列表页封面图路径
+      cover: "1彩虹饮食法-封面.jpg", 
+      // 🔴 请修改：标题
+      title: "健康饮食多样化，解锁彩虹饮食清单！",
+      // 🔴 请修改：正文
+      desc: "",
+      // 🔴 请修改：视频文件路径
+      videoSrc: "1彩虹饮食法.mp4" 
+    }
+  ];
+
+  /* 
+    ============================================================================
+    ⚙️ 系统逻辑 (包含轮播图功能)
+    ============================================================================
+  */
+  
+  // 随机打乱
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  // 初始化页面
+  function initFeed() {
+    const grid = document.getElementById('feedGrid');
+    const shuffledNotes = shuffleArray([...notesData]); 
+    grid.innerHTML = ''; 
+    
+    shuffledNotes.forEach(note => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.onclick = () => openModal(note.id);
+
+      const playIconHtml = note.type === 'video' 
+        ? `<svg style="position:absolute; top:10px; right:10px; width:24px; height:24px; color:white; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3" fill="transparent"></polygon><path d="M5 3 L19 12 L5 21 Z" fill="rgba(0,0,0,0.2)" stroke="white" stroke-width="2" /></svg>` 
+        : '';
+
+      card.innerHTML = `
+        <div class="card-media">
+          <img src="${note.cover}" alt="cover">
+          ${playIconHtml}
+        </div>
+        <div class="card-info">
+          <div class="card-title">${note.title}</div>
+          <div class="card-user">
+            <div class="user-left">
+              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23a2d2ff'/><circle cx='80' cy='20' r='10' fill='%23ffea00'/><path d='M0 100 L40 60 L70 90 L100 50 L100 100 Z' fill='%23a8d08d'/></svg>" class="user-avatar" alt="">
+              <span>匿名用户</span>
+            </div>
+            <div class="like-right">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+            </div>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // 详情页元素
+  const overlay = document.getElementById('overlay');
+  const modalMedia = document.getElementById('modalMedia');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalDesc = document.getElementById('modalDesc');
+  
+  // 轮播图状态
+  let currentSlideIndex = 0;
+  let currentSlideImages = [];
+
+  function openModal(id) {
+    const data = notesData.find(n => n.id === id);
+    if(!data) return;
+
+    modalTitle.innerText = data.title;
+    modalDesc.innerText = data.desc;
+    modalMedia.innerHTML = ''; // 清空旧内容
+
+    // 1. 视频类型
+    if(data.type === 'video') {
+      const video = document.createElement('video');
+      video.src = data.videoSrc;
+      video.controls = true;
+      // video.autoplay = true;
+      modalMedia.appendChild(video);
+    } 
+    // 2. 图片类型 (开启轮播图)
+    else if (data.type === 'image') {
+      currentSlideImages = data.images || [data.cover];
+      currentSlideIndex = 0;
+      renderSlider();
+    } 
+    // 3. 文字类型 (显示单张封面)
+    else {
+      const img = document.createElement('img');
+      img.src = data.cover;
+      img.style.maxWidth = "100%";
+      img.style.maxHeight = "100%";
+      img.style.objectFit = "contain";
+      modalMedia.appendChild(img);
+    }
+
+    overlay.classList.add('open');
+  }
+
+  // 🔥 渲染轮播图核心逻辑
+  function renderSlider() {
+    modalMedia.innerHTML = ''; // 清空
+    
+    // 1. 放入所有图片 (只显示当前Index的)
+    currentSlideImages.forEach((src, idx) => {
+      const img = document.createElement('img');
+      img.src = src;
+      img.className = `slider-img ${idx === currentSlideIndex ? 'active' : ''}`;
+      modalMedia.appendChild(img);
+    });
+
+    // 如果只有一张图，不显示按钮和圆点
+    if(currentSlideImages.length <= 1) return;
+
+    // 2. 左箭头
+    const prevBtn = document.createElement('div');
+    prevBtn.className = `slider-btn slider-prev ${currentSlideIndex === 0 ? 'hidden' : ''}`;
+    prevBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+    prevBtn.onclick = (e) => { e.stopPropagation(); changeSlide(-1); };
+    modalMedia.appendChild(prevBtn);
+
+    // 3. 右箭头
+    const nextBtn = document.createElement('div');
+    nextBtn.className = `slider-btn slider-next ${currentSlideIndex === currentSlideImages.length - 1 ? 'hidden' : ''}`;
+    nextBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    nextBtn.onclick = (e) => { e.stopPropagation(); changeSlide(1); };
+    modalMedia.appendChild(nextBtn);
+
+    // 4. 底部圆点
+    const dotsContainer = document.createElement('div');
+    dotsContainer.className = 'slider-dots';
+    for(let i=0; i<currentSlideImages.length; i++) {
+      const dot = document.createElement('div');
+      dot.className = `slider-dot ${i === currentSlideIndex ? 'active' : ''}`;
+      dotsContainer.appendChild(dot);
+    }
+    modalMedia.appendChild(dotsContainer);
+
+    // 5. 右上角页码 (1/5)
+    const counter = document.createElement('div');
+    counter.className = 'image-counter';
+    counter.innerText = `${currentSlideIndex + 1}/${currentSlideImages.length}`;
+    modalMedia.appendChild(counter);
+  }
+
+  // 切换图片
+  function changeSlide(direction) {
+    const newIndex = currentSlideIndex + direction;
+    if(newIndex >= 0 && newIndex < currentSlideImages.length) {
+      currentSlideIndex = newIndex;
+      renderSlider(); // 重新渲染所有状态
+    }
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+    modalMedia.innerHTML = ''; 
+  }
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
+
+  window.onload = initFeed;
+
+</script>
+</body>
+</html>
